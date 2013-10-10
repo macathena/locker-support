@@ -1,0 +1,140 @@
+#!/usr/bin/python
+
+import sys
+import locker
+import os
+import pwd
+import logging
+from optparse import OptionParser
+
+logger = logging.getLogger('quota')
+
+usage = "%prog [-v] [-a | -f filesystem [-f filesystem ...]]"
+
+def deprecated_callback(option, opt_str, value, parser):
+    """
+    An OptionParser callback for deprecated options
+    """
+    print >>sys.stderr, "WARNING: '%s' is obsolete and will be removed in future versions." % (opt_str)
+
+parser = OptionParser(usage=usage)
+parser.set_defaults(verbose=False, all_filesys=False, parsable=False,
+                    filesys=[])
+parser.add_option("-v", dest="verbose", action="store_true",
+                  help="Display quotas where we have write permission")
+parser.add_option("-a", dest="all_filesys", action="store_true",
+                  help="Display quotas for all attached lockers")
+parser.add_option("-f", dest="filesys", action="append",
+                  help="Operation only on this filesystem")
+parser.add_option("--parsable", dest="parsable", action="store_true",
+                  help="Output suitable for parsing")
+parser.add_option("--debug", dest="debug", action="store_true",
+                  default=False, help="Debugging mode")
+# Deprecated options
+parser.add_option("-u", action="callback",
+                  callback=deprecated_callback, help="[obsolete]")
+parser.add_option("-g", action="callback",
+                  callback=deprecated_callback, help="[obsolete]")
+
+(options, args) = parser.parse_args()
+
+if options.debug:
+    logging.basicConfig()
+    logger.setLevel(logging.DEBUG)
+
+if len(args) > 0:
+    parser.error("command no longer takes any arguments (i.e. no usernames).")
+
+if options.all_filesys:
+    if len(options.filesys) > 0:
+        parser.error("-a and -f are mutually exclusive")
+    if options.parsable:
+        parser.error("-a cannot be used with --parsable")
+
+if options.parsable and not options.verbose:
+    parser.error("--parsable is meaningless without -v")
+
+try:
+    at = locker.read_attachtab()
+except locker.LockerError as e:
+    sys.exit(e)
+
+# Save the output for later printing
+output={'quotas': [],
+        'parsable': [],
+        'overage': []}
+
+# Squash duplicates and create a list of mountpoints
+filesystems=[]
+for x in set(options.filesys):
+    if '/' in x:
+        filesystems.append(x)
+        continue
+    if x not in at:
+        # See NOTES[6]
+        print >>sys.stderr, "%s: Not attached." % (x,)
+        print >>sys.stderr, "%s: Unknown filesystem %s." % (sys.argv[0], x)
+        sys.exit(1)
+    filesystems.append(at[x].mountpoint)
+
+for l in at:
+    logger.debug("Considering %s...", l)
+    if len(options.filesys) > 0:
+        # If they gave us a filesystem...
+        if l not in filesystems:
+            # ... and this locker doesn't match it (either mountpoint or
+            # locker name), move on
+            logger.debug("...skipping, not requested.")
+            continue
+    else:
+        # If they didn't pass any specific filesystems...
+        if not options.all_filesys and not os.access(l, os.W_OK):
+            # ...and didn't pass -a and they don't have write
+            # permissions to the locker, skip it
+            logger.debug("...skipping, not writable.")
+            continue
+
+    try:
+        quota = at[l].getQuota()
+    except locker.LockerNotSupportedError as e:
+        logger.debug("...locker not supported.")
+        continue
+    except locker.LockerError as e:
+        logger.debug("Exception while getting quota: %s", e)
+        if options.verbose:
+            # The old quota only displayed errors in verbose mode.
+            output['quotas'].append(e.message)
+        continue
+
+    pct = quota.percentage()
+    logger.debug("Usage: %d%%", pct)
+    output['quotas'].append("%-16s %8s %8s %8s %s" % \
+                                (l, quota['usage'],
+                                 quota['max'], quota['max'],
+                                 '<<' if pct >= 90 else ''))
+    output['parsable'].append("%s %s %s %s" % (l, quota['usage'], quota['max'], pct))
+    if pct >= 90:
+        output['overage'].append("%d%% of the disk quota on %s has been used." % (pct, l))
+
+if options.verbose:
+    if options.parsable:
+        print "\n".join(output['parsable'])
+        sys.exit(0)
+    uid = os.getuid()
+    try:
+        username = pwd.getpwuid(uid).pw_name
+    except Exception as e:
+        logger.debug("Exception while getting username: %s", e)
+        username = "unknown user"
+    print "Disk quotas for %s (uid %d)" % (username, uid)
+    print "%-16s %8s %8s %8s    %8s %8s %8s" % ("Filesystem",
+                                                "usage", "quota",
+                                                "limit", "files",
+                                                "quota", "limit")
+    print "\n".join(output['quotas'])
+# We always print a blank line.
+print ''
+if len(output['overage']) > 0:
+    print "\n".join(output['overage'])
+
+sys.exit(0)

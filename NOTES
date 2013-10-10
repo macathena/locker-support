@@ -1,0 +1,41 @@
+Development notes for the current version.  This file is referenced by
+footnotes in the source code in various locations.
+
+1. The old suite of attach commands (attach, detach, fsid, nfsid, zinit)
+   all took "-P" as their first argument to allow them to masquerade as
+   another member of the suite.  Spaces between -P and the value were
+   not allowed.  For bonus points, add(1) also took a separate -P
+   argument ("-P athena_path"), but that syntax has been obsolete for
+   years.  The current version replicates the check used in suite.c to
+   figure out if attach(1) is being called as add(1).  Masquerading as
+   anything else (e.g. attach -Pfsid) is no longer supported, and was
+   never a good idea to begin with.
+
+2. It is possible to end up with positional arguments from both parsers,
+   albeit not with the default shell aliases.  But the old syntax
+   supported it, so we will too, even though it's dumb.
+   (e.g. attach -Padd -b barnowl -a -h consult)
+
+3. The old syntax allowed options (-e) to directly modify the positional
+   argument that followed them, rather than changing the behavior of the
+   command.  (e.g. attach -h consult -e small-gods:/slackware/current,
+   where "-h" only applies to consult).  That is annoying to implement
+   with OptionParser, and not worth doing.
+
+4. The old add(1) looked at the first positional argument.  If it was a
+   path, all subsequent arguments were required to be paths, and
+   specifying a locker was an error (e.g. add /var/local consult).  If
+   the first positional argument was a locker name, all subsequent
+   arguments were interpreted as locker names.  For example, "add
+   consult /usr/games" would add the consult locker, and attempt to
+   lookup the "/usr/games" locker in Hesiod.  This was dumb, and now we
+   require that the user not mix paths and locker names.  Paths in the
+   cwd must be prefixed with "./"
+
+5. Despite the fact that add(1) operates on $PATH, we always printed the
+   path using $path syntax (space-separated) in tcsh mode, for legacy
+   reasons.
+
+6. The old quota(1) command bailed if any locker was specified by name
+   that was not attached.  It did not even attempt to process valid
+   lockers.  So we'll emulate that behavior.

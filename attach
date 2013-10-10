@@ -1,0 +1,273 @@
+#!/usr/bin/python
+
+import sys
+import subprocess
+import logging
+import os
+import re
+from optparse import OptionParser
+
+import athdir
+import locker
+
+logger = logging.getLogger('attach')
+# Paths to be shortened when printing
+path_shorten_re = re.compile(r'/mit/([^/]+).*bin')
+# A map of athdir directories to environment variables
+varmap = { 'bin': 'PATH',
+           'man': 'MANPATH',
+           'info': 'INFOPATH' }
+
+class OrderedSet(list):
+    """
+    For de-duping lists.
+    (We don't have collections.OrderedDict in 2.6)
+    """
+    def __init__(self, iterable):
+        super(OrderedSet, self).__init__()
+        for x in iterable:
+            if x not in self:
+                self.append(x)
+
+    def remove(self, x):
+        """
+        Remove an item if it exists, without throwing ValueError
+        """
+        if x in self:
+            super(OrderedSet, self).remove(x)
+
+class Environment(dict):
+    varmap = { 'bin': 'PATH',
+               'man': 'MANPATH',
+               'info': 'INFOPATH' }
+
+    def __init__(self):
+        super(Environment, self).__init__()
+        for val in self.varmap.values():
+            self[val] = OrderedSet(os.getenv(val, '').split(':'))
+
+    def addLocker(self, mountpoint, options):
+        for subdir in varmap:
+            adir = athdir.Athdir(mountpoint, subdir)
+            paths = adir.get_paths()
+            assert len(paths) < 2
+            if subdir == 'bin' and options.warn:
+                if len(paths) == 0:
+                    print >>sys.stderr, \
+                        "%s: warning: %s has no binary directory" % \
+                        (sys.argv[0], mountpoint)
+                else:
+                    if False in [adir.is_native(p) for p in paths]:
+                        print >>sys.stderr, \
+                            "%s: warning: using compatibility for %s" % \
+                            (sys.argv[0], mountpoint)
+            for p in paths:
+                self[varmap[subdir]].remove(p)
+                if options.front:
+                    self[varmap[subdir]].insert(0,p)
+                else:
+                    self[varmap[subdir]].append(p)
+
+    def removeLocker(self, mountpoint):
+        for subdir in varmap:
+            adir = athdir.Athdir(mountpoint, subdir)
+            for path in adir.get_paths(listAll=True):
+                self[varmap[subdir]].remove(path)
+
+    def toShell(self, bourne=False):
+        # This can result in a spurious trailing colon for INFOPATH.
+        # Do we care?
+        template = "setenv %s \"%s\""
+        if bourne:
+            template = "export %s=\"%s\""
+        rv = []
+        for val in self:
+            rv.append(template % (val, ':'.join(self[val])))
+        return "\n".join(rv)
+
+def shorten_path(p):
+    match = path_shorten_re.match(p)
+    if match is None:
+        return p
+    return "{add %s%s}" % (match.group(1),
+                           '' if athdir.Athdir.is_native(p) else '*')
+
+def attach_filesys(filesys, options):
+    logger.debug("Attaching %s", filesys)
+    if options.lookup:
+        try:
+            results = locker.resolve(filesys)
+            print "%s resolves to:" % (filesys)
+            for r in results:
+                print "%s %s%s" % \
+                    (r['type'], r['data'],
+                     ' ' + str(r['priority']) if r['priority'] > 0 else '')
+        except (locker.LockerNotFoundError, locker.LockerError) as e:
+            print >>sys.stderr, e
+    else:
+        # Multiple entries will only be returned for FSGROUPs
+        # which we want to try in order.  Once successful, we're done
+        filesystems = []
+        if options.explicit:
+            filesystems.append(locker.LOCLocker(options.mountpoint, " ".join([filesys, 'n', options.mountpoint])))
+        else:
+            try:
+                filesystems = locker.lookup(filesys)
+            except locker.LockerError as e:
+                print >>sys.stderr, e
+        for entry in filesystems:
+            logger.debug("Attempting to attach %s", entry)
+            if entry.authRequired or entry.authDesired:
+                try:
+                    subprocess.check_call(entry.getAuthCommandline())
+                except subprocess.CalledProcessError as e:
+                    print >>sys.stderr, "Error while authenticating:", e
+                    if entry.authRequired:
+                        return None
+            if options.mountpoint is not None:
+                entry.mountpoint = options.mountpoint
+            try:
+                entry.attach(force=options.force)
+            except locker.LockerError as e:
+                print >>sys.stderr, e
+                continue
+            if options.printpath:
+                print entry.mountpoint
+            elif options.verbose:
+                print "%s: %s attached to %s for filesystem %s" % \
+                      (sys.argv[0], entry.path, entry.mountpoint, entry.name)
+            return entry.mountpoint
+        return None
+
+
+# __main__
+
+addusage = """%prog [-f] [-r] [-q] [-w] [-a attachopts] locker [locker ...]
+       %prog [-f] [-r] pathname [pathname ...]
+       %prog [-p]"""
+
+def attachopts_callback(option, opt_str, value, parser):
+    # Consume all remaining values on the list
+    assert value is None
+    value = []
+    for arg in parser.rargs:
+        value.append(arg)
+    del parser.rargs[:len(value)]
+    setattr(parser.values, option.dest, value)
+
+addParser = OptionParser(usage=addusage, prog="add",
+                         add_help_option=False)
+addParser.add_option("-f", dest="front", action="store_true", default=False,
+                     help="Add to front of path")
+addParser.add_option("-r", dest="remove", action="store_true", default=False,
+                     help="Remove from path")
+addParser.add_option("-w", dest="warn", action="store_true", default=False,
+                     help="Warn when using compatibility")
+addParser.add_option("-p", dest="printpath", action="store_true", default=False,
+                     help="Print readable path")
+addParser.add_option("-b", dest="bourne", action="store_true", default=False,
+                     help="Output bourne shell syntax")
+addParser.add_option("-q", dest="deprecated", action="store_true",
+                     help="[deprecated]")
+addParser.add_option("-a", dest="attachopts", action="callback", default=[],
+                     callback=attachopts_callback,
+                     help="Pass options to attach")
+addParser.add_option("-?", "--help", action="help",
+                     help="show this help message and exit")
+
+attachusage = """%prog [-v | -q | -p] [-z | -h] locker [locker ...]
+       %prog [-l locker [locker ...]
+       %prog """
+attachParser = OptionParser(usage=attachusage, add_help_option=False)
+attachParser.set_defaults(zephyr=False, verbose=True, force=False,
+                          printpath=False, lookup=False, explicit=False, mountpoint=None)
+attachParser.add_option("-z", "--zephyr", dest="zephyr", action="store_true",
+                        help="Subscribe to zephyr notifications")
+attachParser.add_option("-h", "--nozephyr", dest="zephyr", action="store_false",
+                        help="Do not subscribe to zephyr notifications")
+attachParser.add_option("-v", "--verbose", dest="verbose", action="store_true",
+                        help="Display information when attaching")
+attachParser.add_option("-q", "--quiet", dest="verbose", action="store_false",
+                        help="Do not display information when attaching")
+attachParser.add_option("-p", "--printpath", dest="printpath",
+                        action="store_true",
+                        help="Print the mountpoint when attaching")
+attachParser.add_option("-l", "--lookup", dest="lookup", action="store_true",
+                        help="Lookup the locker and print the result")
+attachParser.add_option("-?", "--help", action="help",
+                        help="show this help message and exit")
+attachParser.add_option("-e", "--explicit", dest="explicit", action="store_true",
+                        help="Interpret the filesystem as an explicit path")
+attachParser.add_option("-m", "--mountpoint", dest="mountpoint", action="store",
+                        help="Override the mountpoint for the filesystem")
+attachParser.add_option("-f", "--force", dest="force", action="store_true",
+                        help="Force the attach, even if the mountpoint is in use")
+attachParser.add_option("--debug", dest="debug", action="store_true",
+                        default=False, help="Debugging mode")
+
+# See NOTES[1]
+argv=sys.argv[1:]
+if (len(argv) > 0) and (argv[0] == "-Padd"):
+    argv.pop(0)
+    (options, args) = addParser.parse_args(argv)
+    if (len(options.attachopts) > 0) and (options.remove or options.printpath):
+        addParser.error("-a cannot be used with -r or -p")
+    (atoptions, atargs) = attachParser.parse_args(options.attachopts)
+    # See NOTES[2] and NOTES[3]
+    lockers = []
+    paths = []
+    for x in args + atargs:
+        if '/' in x:
+            paths.append(x)
+        else:
+            lockers.append(x)
+    # See NOTES[4]
+    if len(paths) and len(lockers):
+        addParser.error("You can't mix pathnames and lockernames.")
+    if atoptions.explicit and atoptions.mountpoint is None:
+        addParser.error("Must pass -m to 'attach' when also passing -e")
+    if atoptions.explicit or atoptions.mountpoint is not None:
+        if len(lockers) > 1:
+            addParser.error("You cannot specify more than one locker when passing -m or -e to 'attach'")
+    # Attach operations done as part of add are always quiet
+    atoptions.verbose=False
+    env = Environment()
+    if options.printpath or len(lockers + paths) < 1:
+        # See NOTES[5]
+        pathsep=':' if options.bourne else ' '
+        print >>sys.stderr, pathsep.join([shorten_path(p) for p in env['PATH']])
+        sys.exit(0)
+    if options.remove:
+        for p in paths:
+            env['PATH'].remove(p)
+        at = None
+        for l in lockers:
+            if at is None:
+                at = locker.read_attachtab()
+            for filesys in lockers:
+                if filesys not in at:
+                    print >>sys.stderr, "%s: Not attached." % (filesys,)
+                continue
+            env.removeLocker(at.mountpoint)
+    else:
+        for filesys in lockers:
+            mountpoint = attach_filesys(filesys, atoptions)
+            if mountpoint is not None:
+                env.addLocker(mountpoint, options)
+        for p in paths:
+            env['PATH'].append(p)
+    print env.toShell(options.bourne)
+else:
+    (options, args) = attachParser.parse_args(argv)
+    if options.debug:
+        logging.basicConfig()
+        logger.setLevel(logging.DEBUG)
+    if len(args) < 1:
+        print locker.read_attachtab()._legacyFormat()
+    if options.explicit and not options.mountpoint:
+        attachParser.error("Must specify mountpoint (-m) when using -e")
+    if (options.explicit or options.mountpoint) and len(args) != 1:
+        attachParser.error("Must specify exactly one argument when using -e or -m")
+    for filesys in args:
+        attach_filesys(filesys, options)
+sys.exit(0)

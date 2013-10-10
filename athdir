@@ -1,0 +1,85 @@
+#!/usr/bin/python
+
+import athdir
+import sys
+import logging
+from optparse import OptionParser
+
+def path_callback(option, opt_str, value, parser):
+    assert value is None
+    value = []
+    for arg in parser.rargs:
+        if arg[:2] == "--" and len(arg) > 2:
+            break
+        if arg[:1] == "-" and len(arg) > 1:
+            break
+        value.append(arg)
+
+    del parser.rargs[:len(value)]
+    setattr(parser.values, option.dest, value)
+
+usage = """%prog path [type]
+   or: athdir [-t type] [-p path ...] [-e] [-c] [-l] [-d | -i]
+       [-r recsep] [-f format] [-s sysname] [-m machtype]"""
+parser = OptionParser(usage=usage)
+parser.set_defaults(suppressEditorials=False, suppressSearch=False,
+                    listAll=False, forceIndependent=False,
+                    forceDependent=False, recsep="\n",
+                    lockerpath=['%p'], type='%t',
+                    format=None, sysname=None,
+                    machtype=None, debug=False)
+parser.add_option("-t", dest="type", action="store",
+                  help="directory type (e.g. 'bin', 'lib', ...)")
+parser.add_option("-p", dest="lockerpath", action="callback",
+                  callback=path_callback, help="One or more paths")
+parser.add_option("-e", dest="suppressEditorials", action="store_true",
+                  help="Supress editorializing about legacy paths")
+parser.add_option("-c", dest="suppressSearch", action="store_true",
+                  help="Choose the first acceptable path")
+parser.add_option("-l", dest="listAll", action="store_true",
+                  help="List all search paths")
+parser.add_option("-i", dest="forceIndependent", action="store_true",
+                  help="Force athdir to choose a machine-independent path")
+parser.add_option("-d", dest="forceDependent", action="store_true",
+                  help="Force athdir to choose a machine-dependent path")
+parser.add_option("-r", dest="recsep", action="store",
+                  help="Override the record separator (newline)")
+parser.add_option("-f", dest="format", action="store",
+                  help="Supply a custom path format string")
+parser.add_option("-s", dest="sysname", help="Override ATHENA_SYS value")
+parser.add_option("-m", dest="machtype", help="Override machtype value")
+parser.add_option("--debug", dest="debug", action="store_true",
+                  help="Verbose debugging")
+
+
+if len(sys.argv) < 2:
+    sys.exit(parser.get_usage())
+
+if len(sys.argv) == 3 and (True not in [ x.startswith('-') for x in sys.argv]):
+    a = athdir.Athdir(sys.argv[1], sys.argv[2])
+    print ''.join(a.get_paths())
+    sys.exit(0)
+
+(options, args) = parser.parse_args()
+if options.debug:
+    logging.basicConfig(level=logging.DEBUG)
+
+if (len(args) > 0):
+    sys.exit(parser.get_usage())
+
+if options.forceDependent and options.forceIndependent:
+    parser.error("-d and -i are mutually exclusive")
+
+if not options.suppressSearch and (options.forceDependent or
+                                   options.forceIndependent):
+    parser.error("-d and -i are meaningless without -c")
+
+paths = []
+for p in options.lockerpath:
+    a = athdir.Athdir(p, options.type, options.format,
+                      options.sysname, options.machtype)
+    paths += a.get_paths(options.suppressEditorials, options.suppressSearch,
+                         options.forceDependent, options.forceIndependent,
+                         options.listAll)
+print options.recsep.join(paths)
+sys.exit(0)

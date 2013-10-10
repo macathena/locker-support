@@ -1,0 +1,129 @@
+#!/usr/bin/python
+
+import sys, os
+import socket
+import logging
+from optparse import OptionParser
+import locker
+
+logger = logging.getLogger('detach')
+
+# We used to support passing different options to each filesystem
+# (e.g. detach -z consult -h sipb, which would unsubscribe you from
+# zephyr notifications for consult but not sipb), but that option
+# parsing code would suck.  Also, I don't care.
+#
+usage = """%prog [options] filesystem ...
+       %prog [options] mountpoint ...
+       %prog [options] -H host ...
+       %prog [options] -a"""
+
+def deprecated_callback(option, opt_str, value, parser):
+    """
+    An OptionParser callback for deprecated options
+    """
+    print >>sys.stderr, "WARNING: '%s' is obsolete and will be removed in future versions." % (opt_str)
+
+parser = OptionParser(usage=usage, add_help_option=False)
+parser.set_defaults(zephyr=False, unmap=True, verbose=True,
+                    all_filesys=False, explicit=False, fstype=[])
+parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
+                  help="Display information when detaching")
+parser.add_option("-q", "--quiet", dest="verbose", action="store_false",
+                  help="Do not display information when detaching")
+parser.add_option("-a", "--all", dest="all_filesys", action="store_true",
+                  help="Detach all attached filesystems")
+parser.add_option("-z", "--zephyr", dest="zephyr", action="store_true",
+                  help="Unsubscribe from zephyr notifications")
+parser.add_option("-h", "--nozephyr", dest="zephyr", action="store_false",
+                  help="Do not unsubscribe from zephyr notifications")
+parser.add_option("-y", "--unmap", dest="unmap", action="store_true",
+                  help="Attempt to remove authentication")
+parser.add_option("-n", "--nomap", dest="unmap", action="store_false",
+                  help="Do not attempt to remove authentication")
+parser.add_option("-t", "--type", dest="fstype", action="append",
+                  help="Limit -a operation to FSTYPE")
+# Do we want this in a FUSE world?
+parser.add_option("-H", "--host", dest="host", action="store",
+                  help="Detach all filesystems served from HOST")
+# Add the help option manually, because -h is already used for something else
+parser.add_option("-?", "--help", action="help",
+                  help="show this help message and exit")
+parser.add_option("--debug", dest="debug", action="store_true",
+                  default=False, help="Debugging mode")
+# Deprecated options
+# -C and -O are meaningless in a FUSE world
+# -C used to mean "clean": detach the filesys only if it's not wanted
+#    by anyone in /etc/passwd
+# -O used to mean "override": detach filesystems regardless of if they're
+#    wanted
+# -e used to mean "explicit": parse the argument as though it was
+#    host:directory (for NFS) or a path (for AFS), and convert it to a
+#    mount point (e.g. for NFS: /hostname/export).  This is
+#    meaningless now.  We may still support explicit attaches (to offload
+#    onto a /net automounter or something), but detaches can happen on
+#    the mountpoint.
+# -x was used to reverse -e's behavior.  We no longer support per-filesys
+#    options.
+parser.add_option("-C", "--clean", action="callback",
+                  callback=deprecated_callback, help="[obsolete]")
+parser.add_option("-O", "--override", action="callback",
+                  callback=deprecated_callback, help="[obsolete]")
+parser.add_option("-e", "--explicit", action="callback",
+                  callback=deprecated_callback, help="[obsolete]")
+parser.add_option("-x", "--noexplicit", action="callback",
+                  callback=deprecated_callback, help="[obsolete]")
+(options, args) = parser.parse_args()
+
+if options.debug:
+    logging.basicConfig()
+    logger.setLevel(logging.DEBUG)
+
+if options.all_filesys:
+    if len(args) != 0:
+        parser.error("-a does not take arguments.")
+
+if options.fstype and not options.all_filesys:
+    parser.error("-t is meaningless without -a")
+
+# Uppercase everything so it matches hesiod
+options.fstype = [x.upper() for x in options.fstype]
+
+attachtab = locker.read_attachtab()
+# TODO: Should we let them 'detach' their homedir?
+if options.host:
+    try:
+        hostent = socket.gethostbyname_ex(options.host)
+        hostset = set([hostent[0].lower()] + hostent[2])
+    except socket.herror:
+        sys.exit("Cannot lookup host '%s'" % (options.host))
+
+if options.all_filesys or options.host:
+    for l in attachtab:
+        if options.host:
+            try:
+                if len(hostset.intersection([x.lower() for x in attachtab[l].getFileServers()])) < 1:
+                    continue
+            except locker.LockerNotSupportedError:
+                continue
+        elif len(options.fstype) > 0 and attachtab[l]._type() not in options.fstype:
+            continue
+        try:
+            attachtab[l].detach()
+            if options.verbose:
+                print >>sys.stderr, "%s: %s detached" % (sys.argv[0], attachtab[l].name)
+        except locker.LockerError as e:
+            print >>sys.stderr, "%s: Unable to detach: %s" % (l, e)
+    sys.exit(0)
+
+for a in args:
+    if a in attachtab:
+        try:
+            attachtab[a].detach()
+            if options.verbose:
+                print >>sys.stderr, "%s: %s detached" % (sys.argv[0], attachtab[a].name)
+        except locker.LockerError as e:
+            print >>sys.stderr, "%s: Unable to detach: %s" % (l, e)
+    else:
+        print >>sys.stderr, "%s: Not attached." % (a,)
+sys.exit(0)

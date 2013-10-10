@@ -1,0 +1,116 @@
+#!/usr/bin/python
+
+import sys, os
+import logging
+from optparse import OptionParser
+import locker
+import subprocess
+
+logger = logging.getLogger('fsid')
+
+def do_map(l, options):
+    cmdline = l.getAuthCommandline()
+    if not options.map:
+        cmdline = l.getDeauthCommandline()
+    if cmdline is None:
+        print >>sys.stderr, "%s: %s: %smapping not supported" % (sys.argv[0],
+                                                                 l.name,
+                                                                 '' if options.map else 'un')
+    else:
+        try:
+            subprocess.check_call(cmdline)
+            if options.verbose:
+                print >>sys.stderr, "%s: %s mapped" % (sys.argv[0],
+                                                       l.name)
+        except subprocess.CalledProcessError as e:
+            print >>sys.stderr, "%s: Unable to map %s" % (sys.argv[0],
+                                                          l.name)
+        except locker.LockerError as e:
+            print >>sys.stderr, "%s: %s: %s" % (sys.argv[0],
+                                                l.name,
+                                                e)
+
+def deprecated_callback(option, opt_str, value, parser):
+    """
+    An OptionParser callback for deprecated options
+    """
+    print >>sys.stderr, "WARNING: '%s' is obsolete and will be removed in future versions." % (opt_str)
+
+usage = """%prog [options] [-f] filesystem ...
+       %prog [options] -c cell ...
+       %prog [options] -a"""
+
+parser = OptionParser(usage=usage, add_help_option=False)
+parser.set_defaults(verbose=True, map=True, all_filesys=False, cells=[],
+                    filesystems=[])
+parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
+                  help="Display information when mapping")
+parser.add_option("-q", "--quiet", dest="verbose", action="store_false",
+                  help="Do not display information")
+parser.add_option("-a", "--all", dest="all_filesys", action="store_true",
+                  help="Map to all attached filesystems")
+parser.add_option("-m", "--map", dest="map", action="store_true",
+                  help="Attempt to remove authentication")
+parser.add_option("-u", "--unmap", dest="map", action="store_false",
+                  help="Do not attempt to remove authentication")
+parser.add_option("-c", "--cell", dest="cells", action="append",
+                  help="Authenticate to the specified cell(s)")
+parser.add_option("-f", "--filsys", dest="filesystems", action="append",
+                  help="Map to the specified filesystems")
+# Add the help option manually, because -h is already used for something else
+parser.add_option("-?", "--help", action="help",
+                  help="show this help message and exit")
+parser.add_option("--debug", dest="debug", action="store_true",
+                  default=False, help="Debugging mode")
+# Deprecated options
+# -p purged host mappings for NFS
+# -r purged user mappins for NFS
+# -h operated on the specified host only (NFS)
+parser.add_option("-h", "--host", action="callback", type="string",
+                  callback=deprecated_callback, help="[obsolete]")
+parser.add_option("-p", "--purge", action="callback",
+                  callback=deprecated_callback, help="[obsolete]")
+parser.add_option("-r", "--purgeuser", action="callback",
+                  callback=deprecated_callback, help="[obsolete]")
+(options, args) = parser.parse_args()
+
+if options.debug:
+    logging.basicConfig()
+    logger.setLevel(logging.DEBUG)
+
+if len(args) != 0:
+    if options.all_filesys:
+        parser.error("-a does not take arguments.")
+    if len(options.filesystems):
+        parser.error("Cannot mix -f with other filesystems or hosts")
+
+if len(options.filesystems) and options.all_filesys:
+    parser.error("-a and -f are mutually exclusive")
+
+if len(options.cells):
+    stderr = None
+    try:
+        cmdline = ['aklog'] + sum((['-cell', x] for x in options.cells), [])
+        stderr = subprocess.Popen(cmdline,
+                                  stderr=subprocess.PIPE).communicate()[1]
+    except OSError as e:
+        sys.exit("Unable to run aklog: %s" % (e.strerror,))
+    sys.exit(0 if stderr is None else 1)
+
+try:
+    attachtab = locker.read_attachtab()
+except locker.LockerError as e:
+    sys.exit(e)
+
+if options.all_filesys:
+    for f in attachtab:
+        do_map(attachtab[f], options)
+    sys.exit(0)
+
+for f in options.filesystems + args:
+    if f in attachtab:
+        do_map(attachtab[f], options)
+    else:
+        print >>sys.stderr, "%s: %s not attached" % (sys.argv[0], f)
+
+sys.exit(0)
