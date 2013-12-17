@@ -1,0 +1,16 @@
+Source: debathena-locker-support
+Section: debathena/net
+Priority: extra
+Maintainer: Debathena Project <debathena@mit.edu>
+Build-Depends: debhelper (>= 7.0.50~)
+Standards-Version: 3.9.3
+
+Package: debathena-python-locker-support
+Architecture: all
+Depends: ${misc:Depends},
+ ${python:Depends},
+ python-afs (>= 0.2.0-1~),
+ python-hesiod (>= 0.2.11~),
+Description: Python modules for Athena's "locker" framework
+ This package provides the "locker" and "athdir" modules,
+ for use with debathena-pyhesiodfs and more
