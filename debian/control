@@ -14,3 +14,13 @@ Depends: ${misc:Depends},
 Description: Python modules for Athena's "locker" framework
  This package provides the "locker" and "athdir" modules,
  for use with debathena-pyhesiodfs and more
+
+Package: debathena-locker-utils
+Architecture: all
+Depends: ${misc:Depends},
+ ${python:Depends},
+ debathena-python-locker-support,
+Description: Userland utilities for the Athena "locker" framework
+ This package provides the "attach", "detach", "fsid", "athdir", and
+ "quota" commands, though it does not install them in locations
+ searched by the user's path, by default.
