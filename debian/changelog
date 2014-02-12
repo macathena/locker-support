@@ -1,8 +1,9 @@
-debathena-locker-support (10.4-0debathena1) UNRELEASED; urgency=low
+debathena-locker-support (10.4-0debathena1) unstable; urgency=low
 
   * Bump version to 10.4 to work around legacy versioned-dependency issues
+  * Add git-buildpackage configuration
 
- -- Jonathan Reed <jdreed@mit.edu>  Wed, 12 Feb 2014 13:22:22 -0500
+ -- Jonathan Reed <jdreed@mit.edu>  Wed, 12 Feb 2014 15:47:21 -0500
 
 debathena-locker-support (1.0) unstable; urgency=low
 
