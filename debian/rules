@@ -5,4 +5,4 @@
 	dh --with-python2 $@
 
 override_dh_auto_install:
-	dh_auto_install -- --install-scripts=/usr/lib/debathena-locker-utils
+	dh_auto_install -- --install-scripts=/usr/bin

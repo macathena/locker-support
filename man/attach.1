@@ -1,0 +1,133 @@
+.\" $Id: attach.1,v 1.16 2004-08-11 15:20:17 ghudson Exp $
+.\"
+.\" Copyright 1997 by the Massachusetts Institute of Technology.
+.\"
+.\" Permission to use, copy, modify, and distribute this
+.\" software and its documentation for any purpose and without
+.\" fee is hereby granted, provided that the above copyright
+.\" notice appear in all copies and that both that copyright
+.\" notice and this permission notice appear in supporting
+.\" documentation, and that the name of M.I.T. not be used in
+.\" advertising or publicity pertaining to distribution of the
+.\" software without specific, written prior permission.
+.\" M.I.T. makes no representations about the suitability of
+.\" this software for any purpose.  It is provided "as is"
+.\" without express or implied warranty.
+.\"
+.TH ATTACH 1
+.SH NAME
+attach \- attach a remote file system to your workstation
+.SH SYNOPSIS
+.TP 8
+attach
+[-v | -q | -p] [-z | -h] locker ...
+.PP
+.nf
+attach -l \fIfilesystem\fP
+.fi
+.SH DESCRIPTION
+.I attach
+is a filesystem-independent utility which allows you attach a
+filesystem to a directory hierarchy on your workstation. Currently,
+the only supported filesystem type is AFS.
+
+.B NOTE: 
+.I attach 
+is provided mainly for compatibility with previous versions of Athena.
+With Debathena, \fI/mit\fP is auto-mounted, so you can access any path
+under \fI/mit\fP without explicitly attaching the locker.
+
+Attach looks up the \fIfilesystem\fP in
+.BR Hesiod (3)
+to retrieve the file system type, the server host, the name by which
+the file system is known to the server (e.g., an NFS server
+mountpoint), and the default mount point and mode (read-only,
+read-write). 
+
+By default,
+.I attach
+will attempt to make sure the user is authenticated to the remote
+filesystem, by getting tokens in the appropriate cell for an AFS
+locker.
+
+The following arguments to \fIattach\fP modify its behavior. Default
+options are marked as such. Unless otherwise marked, all arguments are
+processed \fIin order\fP. Thus, if a -v option is followed by a -q
+option, the -q option will take precedence (for any lockers that
+appear after the -q on the command line). The long and short forms of
+each option function identically.
+
+If no arguments are given to \fIattach\fP, a list of the currently
+attached filesystems will be printed.
+
+.TP 8
+.I --verbose (-v)
+Display verbose information about a mounted filesystem, such as the
+AFS path or NFS server and the server's filesystem name, if the attach
+is successful. This is the default. Use of this option automatically
+supresses the --printpath option.
+.TP 8
+.I --quiet (-q)
+Don't display verbose information.  Error messages will still be printed.
+.TP 8
+.I --printpath (-p)
+\fIattach\fP normally prints a status message on its standard output
+indicating the success or failure of the attach operation. This flag
+causes the pathname of the mounted filesystem to be printed instead.
+This was used by the old "add" aliases. Use of this option
+automatically surpresses the -verbose option.
+.TP 8
+.I --zephyr (-z)
+Subscribe to
+.BR Zephyr (1)
+messages about the server host.  This is the default.
+.TP 8
+.I --nozephyr (-h)
+Don't subscribe to
+.BR Zephyr (1)
+messages about the server host.
+.PP
+If the default mount-point for a filesystem (or the mount-point
+specified with the -m option) does not exist, it is created.  Any
+directories in the path that do not exist are also created.  If a
+directory can't be created, the attach fails.  When the filesystem is
+detached, any directories that were created during the attach are
+deleted, if possible.
+
+.SH DIAGNOSTICS
+If \fIattach\fP is unable to initalize the locker library, it will
+exit with status 1. If \fIattach\fP encounters a problem attaching a
+locker, it will continue trying to attach any remaining lockers on the
+command line, but eventually exit with status 2.
+
+.SH FILES
+/etc/athena/attach.conf
+.br
+/var/athena/attachtab/
+.br
+
+.SH BUGS
+NFS and RVD lockers are no longer supported.
+
+.SH FEATURES
+NFS and RVD lockers are no longer supported.
+
+.SH "SEE ALSO"
+add(1), detach(1)
+
+.SH AUTHORS
+SIPB Debathena Project
+.PP
+Previous versions by:
+.br
+Dan Winship, MIT Information Systems
+.br
+Robert French, Project Athena
+.br
+Theodore Ts'o, Project Athena
+.br
+John Carr, Project Athena
+.br
+Richard Basch, Project Athena
+.PP
+Copyright 1988, 1990, 1998 Massachusetts Institute of Technology
