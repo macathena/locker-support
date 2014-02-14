@@ -55,8 +55,13 @@ parser.add_option("--debug", dest="debug", action="store_true",
 if len(sys.argv) < 2:
     sys.exit(parser.get_usage())
 
-if len(sys.argv) == 3 and (True not in [ x.startswith('-') for x in sys.argv]):
-    a = athdir.Athdir(sys.argv[1], sys.argv[2])
+# athdir can be invoked one of two ways.
+# a) athdir path [type=bin]
+# b) athdir [bunch of options with no position arguments]
+
+# This is the first invocation.  There's probably a better way.
+if len(sys.argv) <= 3 and not any(x.startswith('-') for x in sys.argv):
+    a = athdir.Athdir(sys.argv[1], sys.argv[2] if len(sys.argv) == 3 else 'bin')
     print ''.join(a.get_paths())
     sys.exit(0)
 
