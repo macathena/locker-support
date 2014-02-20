@@ -1,3 +1,14 @@
+debathena-locker-support (10.4.1.1-0debathena1) unstable; urgency=low
+
+  * Update to 10.4.1.1 (fix bugs in athdir command-line parsing)
+  * Install attach and friends in /bin, not /usr/bin
+  * Symlink /bin/zinit to true temporarily, for people who actually have
+    their own initprogs configuration in zephyr.vars.  We may eventually
+    ship a zinit.
+  * Symlink nfsid to fsid in case it's still 1993 somewhere
+
+ -- Jonathan Reed <jdreed@mit.edu>  Thu, 20 Feb 2014 14:43:50 -0500
+
 debathena-locker-support (10.4-0debathena1) unstable; urgency=low
 
   * Bump version to 10.4 to work around legacy versioned-dependency issues

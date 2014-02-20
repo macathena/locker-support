@@ -1,3 +1,3 @@
-usr/bin/attach
-usr/bin/detach
-usr/bin/fsid
+usr/bin/attach bin
+usr/bin/detach bin
+usr/bin/fsid bin
