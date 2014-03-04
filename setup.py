@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(name='locker-support',
-      version='10.4.1.1',
+      version='10.4.2',
       author='Debathena Project',
       author_email='debathena@mit.edu',
       py_modules=['locker', 'athdir'],

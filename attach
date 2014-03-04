@@ -83,7 +83,7 @@ class Environment(dict):
         rv = []
         for val in self:
             rv.append(template % (val, ':'.join(self[val])))
-        return "\n".join(rv)
+        return ";\n".join(rv)
 
 def shorten_path(p):
     match = path_shorten_re.match(p)
