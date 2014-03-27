@@ -1,3 +1,10 @@
+debathena-locker-support (10.4.3-0debathena1) unstable; urgency=low
+
+  * Update to 10.4.3, which restores legacy options to attach(1)
+    (Trac: #1445)
+
+ -- Jonathan Reed <jdreed@mit.edu>  Thu, 27 Mar 2014 19:04:00 -0400
+
 debathena-locker-support (10.4.2-0debathena1) unstable; urgency=low
 
   * Update to 10.4.2, which fixes a bug in 'add', by adding semicolons to
