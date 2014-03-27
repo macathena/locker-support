@@ -117,7 +117,8 @@ def attach_filesys(filesys, options):
                 print >>sys.stderr, e
         for entry in filesystems:
             logger.debug("Attempting to attach %s", entry)
-            if entry.authRequired or entry.authDesired:
+            if (options.map or options.remap) and \
+                    (entry.authRequired or entry.authDesired):
                 try:
                     subprocess.check_call(entry.getAuthCommandline())
                 except subprocess.CalledProcessError as e:
@@ -145,6 +146,12 @@ def attach_filesys(filesys, options):
 addusage = """%prog [-f] [-r] [-q] [-w] [-a attachopts] locker [locker ...]
        %prog [-f] [-r] pathname [pathname ...]
        %prog [-p]"""
+
+def deprecated_callback(option, opt_str, value, parser):
+    """
+    An OptionParser callback for deprecated options
+    """
+    print >>sys.stderr, "WARNING: '%s' is obsolete and will be removed in future versions." % (opt_str)
 
 def attachopts_callback(option, opt_str, value, parser):
     # Consume all remaining values on the list
@@ -180,7 +187,8 @@ attachusage = """%prog [-v | -q | -p] [-z | -h] locker [locker ...]
        %prog """
 attachParser = OptionParser(usage=attachusage, add_help_option=False)
 attachParser.set_defaults(zephyr=False, verbose=True, force=False,
-                          printpath=False, lookup=False, explicit=False, mountpoint=None)
+                          printpath=False, lookup=False, explicit=False, mountpoint=None,
+                          map=True, remap=True)
 attachParser.add_option("-z", "--zephyr", dest="zephyr", action="store_true",
                         help="Subscribe to zephyr notifications")
 attachParser.add_option("-h", "--nozephyr", dest="zephyr", action="store_false",
@@ -198,12 +206,44 @@ attachParser.add_option("-?", "--help", action="help",
                         help="show this help message and exit")
 attachParser.add_option("-e", "--explicit", dest="explicit", action="store_true",
                         help="Interpret the filesystem as an explicit path")
+attachParser.add_option("-x", "--noexplicit", dest="explicit", action="store_false",
+                        help="Do not interpret the filesystem as an explicit path")
 attachParser.add_option("-m", "--mountpoint", dest="mountpoint", action="store",
                         help="Override the mountpoint for the filesystem")
 attachParser.add_option("-f", "--force", dest="force", action="store_true",
                         help="Force the attach, even if the mountpoint is in use")
 attachParser.add_option("--debug", dest="debug", action="store_true",
                         default=False, help="Debugging mode")
+attachParser.add_option("-y", "--map", dest="map", action="store_true",
+                        help="Attempt to authenticate the user (default)")
+attachParser.add_option("-n", "--nomap", dest="map", action="store_false",
+                        help="Do not attempt to authenticate the user")
+attachParser.add_option("-g", "--remap", dest="remap", action="store_true",
+                        help="Attempt to authenticate the user anyway (default)")
+attachParser.add_option("-a", "--noremap", dest="remap", action="store_false",
+                        help="Do not attempt to authenticate the user if attached")
+
+deprecated = (("-r", "--readonly"),
+              ("-w", "--write"),
+              ("-M", "--master"),
+              ("-N", "--nosetuid"),
+              ("-S", "--setuid"),
+              ("-O", "--override"),
+              ("-L", "--lock"),
+              )
+deprecated_with_nargs = (("-t", "--type"),
+                         ("-o", "--mountoptions"),
+                         ("-H", "--hostnames"),
+                         )
+
+for (k,v) in deprecated:
+    attachParser.add_option(k, v, action="callback",
+                            callback=deprecated_callback, help="[obsolete]")
+
+for (k,v) in deprecated_with_nargs:
+    attachParser.add_option(k, v, type="string", action="callback",
+                            callback=deprecated_callback, help="[obsolete]")
+
 
 # See NOTES[1]
 argv=sys.argv[1:]
@@ -264,6 +304,8 @@ else:
         logger.setLevel(logging.DEBUG)
     if len(args) < 1:
         print locker.read_attachtab()._legacyFormat()
+    if not options.map:
+        options.remap = False
     if options.explicit and not options.mountpoint:
         attachParser.error("Must specify mountpoint (-m) when using -e")
     if (options.explicit or options.mountpoint) and len(args) != 1:
