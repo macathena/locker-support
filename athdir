@@ -62,8 +62,10 @@ if len(sys.argv) < 2:
 # This is the first invocation.  There's probably a better way.
 if len(sys.argv) <= 3 and not any(x.startswith('-') for x in sys.argv):
     a = athdir.Athdir(sys.argv[1], sys.argv[2] if len(sys.argv) == 3 else 'bin')
-    print ''.join(a.get_paths())
-    sys.exit(0)
+    paths = a.get_paths()
+    if len(paths) > 0:
+        print ''.join(paths)
+    sys.exit(0 if len(paths) > 0 else 1)
 
 (options, args) = parser.parse_args()
 if options.debug:
@@ -86,5 +88,6 @@ for p in options.lockerpath:
     paths += a.get_paths(options.suppressEditorials, options.suppressSearch,
                          options.forceDependent, options.forceIndependent,
                          options.listAll)
-print options.recsep.join(paths)
-sys.exit(0)
+if len(paths) > 0:
+    print options.recsep.join(paths)
+sys.exit(0 if len(paths) > 0 else 1)
