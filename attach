@@ -257,7 +257,7 @@ if (len(argv) > 0) and (argv[0] == "-Padd"):
     lockers = []
     paths = []
     for x in args + atargs:
-        if '/' in x:
+        if x.startswith('.') or x.startswith('/'):
             paths.append(x)
         else:
             lockers.append(x)
@@ -295,7 +295,10 @@ if (len(argv) > 0) and (argv[0] == "-Padd"):
             if mountpoint is not None:
                 env.addLocker(mountpoint, options)
         for p in paths:
-            env['PATH'].append(p)
+            if options.front:
+                env['PATH'].insert(0, p)
+            else:
+                env['PATH'].append(p)
     print env.toShell(options.bourne)
 else:
     (options, args) = attachParser.parse_args(argv)
