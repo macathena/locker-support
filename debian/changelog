@@ -1,3 +1,10 @@
+debathena-locker-support (10.4.6-0debathena1) unstable; urgency=low
+
+  * Update to 10.4.6, which contains a fix for add's handling of local
+    paths (Trac: #1465)
+
+ -- Jonathan Reed <jdreed@mit.edu>  Thu, 17 Apr 2014 08:50:26 -0400
+
 debathena-locker-support (10.4.5-0debathena1) unstable; urgency=low
 
   * Update to 10.4.5, which contains a fix for athdir's exit status
