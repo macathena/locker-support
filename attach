@@ -281,14 +281,13 @@ if (len(argv) > 0) and (argv[0] == "-Padd"):
         for p in paths:
             env['PATH'].remove(p)
         at = None
-        for l in lockers:
+        for filesys in lockers:
             if at is None:
                 at = locker.read_attachtab()
-            for filesys in lockers:
-                if filesys not in at:
-                    print >>sys.stderr, "%s: Not attached." % (filesys,)
+            if filesys not in at:
+                print >>sys.stderr, "%s: Not attached." % (filesys,)
                 continue
-            env.removeLocker(at.mountpoint)
+            env.removeLocker(at[filesys].mountpoint)
     else:
         for filesys in lockers:
             mountpoint = attach_filesys(filesys, atoptions)
