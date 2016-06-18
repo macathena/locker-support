@@ -1,3 +1,9 @@
+debathena-locker-support (10.4.7-0debathena2) unstable; urgency=medium
+
+  * Replace python-support with dh-python
+
+ -- Victor Vasiliev <vasilvv@mit.edu>  Fri, 17 Jun 2016 22:46:21 -0400
+
 debathena-locker-support (10.4.7-0debathena1) unstable; urgency=low
 
   * Update to 10.4.7, which contains a fix for add's removal of lockers
