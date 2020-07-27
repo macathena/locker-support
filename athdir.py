@@ -2,6 +2,7 @@
 A Python re-implementation of Athena's libathdir
 """
 import os
+import six
 import subprocess
 import sys
 import logging
@@ -22,7 +23,7 @@ def _machtype(arg=None):
             cmd.append(arg)
         try:
             rv = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()[0].strip()
-            return rv
+            return six.ensure_str(rv)
         except OSError as e:
             logger.info(e)
     return rv
