@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import absolute_import, division, print_function, unicode_literals
 import athdir
 import sys
 import logging
@@ -64,7 +65,7 @@ if len(sys.argv) <= 3 and not any(x.startswith('-') for x in sys.argv):
     a = athdir.Athdir(sys.argv[1], sys.argv[2] if len(sys.argv) == 3 else 'bin')
     paths = a.get_paths()
     if len(paths) > 0:
-        print ''.join(paths)
+        print(''.join(paths))
     sys.exit(0 if len(paths) > 0 else 1)
 
 (options, args) = parser.parse_args()
@@ -89,5 +90,5 @@ for p in options.lockerpath:
                          options.forceDependent, options.forceIndependent,
                          options.listAll)
 if len(paths) > 0:
-    print options.recsep.join(paths)
+    print(options.recsep.join(paths))
 sys.exit(0 if len(paths) > 0 else 1)

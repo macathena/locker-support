@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import absolute_import, division, print_function, unicode_literals
 import sys
 import subprocess
 import logging
@@ -53,14 +54,12 @@ class Environment(dict):
             assert len(paths) < 2
             if subdir == 'bin' and options.warn:
                 if len(paths) == 0:
-                    print >>sys.stderr, \
-                        "%s: warning: %s has no binary directory" % \
-                        (sys.argv[0], mountpoint)
+                    print("%s: warning: %s has no binary directory" % \
+                        (sys.argv[0], mountpoint), file=sys.stderr)
                 else:
                     if False in [adir.is_native(p) for p in paths]:
-                        print >>sys.stderr, \
-                            "%s: warning: using compatibility for %s" % \
-                            (sys.argv[0], mountpoint)
+                        print("%s: warning: using compatibility for %s" % \
+                            (sys.argv[0], mountpoint), file=sys.stderr)
             for p in paths:
                 self[varmap[subdir]].remove(p)
                 if options.front:
@@ -97,13 +96,13 @@ def attach_filesys(filesys, options):
     if options.lookup:
         try:
             results = locker.resolve(filesys)
-            print "%s resolves to:" % (filesys)
+            print("%s resolves to:" % (filesys))
             for r in results:
-                print "%s %s%s" % \
+                print("%s %s%s" % \
                     (r['type'], r['data'],
-                     ' ' + str(r['priority']) if r['priority'] > 0 else '')
+                     ' ' + str(r['priority']) if r['priority'] > 0 else ''))
         except (locker.LockerNotFoundError, locker.LockerError) as e:
-            print >>sys.stderr, e
+            print(e, file=sys.stderr)
     else:
         # Multiple entries will only be returned for FSGROUPs
         # which we want to try in order.  Once successful, we're done
@@ -114,7 +113,7 @@ def attach_filesys(filesys, options):
             try:
                 filesystems = locker.lookup(filesys)
             except locker.LockerError as e:
-                print >>sys.stderr, e
+                print(e, file=sys.stderr)
         for entry in filesystems:
             logger.debug("Attempting to attach %s", entry)
             if (options.map or options.remap) and \
@@ -122,7 +121,7 @@ def attach_filesys(filesys, options):
                 try:
                     subprocess.check_call(entry.getAuthCommandline())
                 except subprocess.CalledProcessError as e:
-                    print >>sys.stderr, "Error while authenticating:", e
+                    print("Error while authenticating:", e, file=sys.stderr)
                     if entry.authRequired:
                         return None
             if options.mountpoint is not None:
@@ -130,13 +129,13 @@ def attach_filesys(filesys, options):
             try:
                 entry.attach(force=options.force)
             except locker.LockerError as e:
-                print >>sys.stderr, e
+                print(e, file=sys.stderr)
                 continue
             if options.printpath:
-                print entry.mountpoint
+                print(entry.mountpoint)
             elif options.verbose:
-                print "%s: %s attached to %s for filesystem %s" % \
-                      (sys.argv[0], entry.path, entry.mountpoint, entry.name)
+                print("%s: %s attached to %s for filesystem %s" % \
+                      (sys.argv[0], entry.path, entry.mountpoint, entry.name))
             return entry.mountpoint
         return None
 
@@ -151,7 +150,7 @@ def deprecated_callback(option, opt_str, value, parser):
     """
     An OptionParser callback for deprecated options
     """
-    print >>sys.stderr, "WARNING: '%s' is obsolete and will be removed in future versions." % (opt_str)
+    print("WARNING: '%s' is obsolete and will be removed in future versions." % (opt_str), file=sys.stderr)
 
 def attachopts_callback(option, opt_str, value, parser):
     # Consume all remaining values on the list
@@ -275,7 +274,7 @@ if (len(argv) > 0) and (argv[0] == "-Padd"):
     if options.printpath or len(lockers + paths) < 1:
         # See NOTES[5]
         pathsep=':' if options.bourne else ' '
-        print >>sys.stderr, pathsep.join([shorten_path(p) for p in env['PATH']])
+        print(pathsep.join([shorten_path(p) for p in env['PATH']]), file=sys.stderr)
         sys.exit(0)
     if options.remove:
         for p in paths:
@@ -285,7 +284,7 @@ if (len(argv) > 0) and (argv[0] == "-Padd"):
             if at is None:
                 at = locker.read_attachtab()
             if filesys not in at:
-                print >>sys.stderr, "%s: Not attached." % (filesys,)
+                print("%s: Not attached." % (filesys,), file=sys.stderr)
                 continue
             env.removeLocker(at[filesys].mountpoint)
     else:
@@ -298,14 +297,14 @@ if (len(argv) > 0) and (argv[0] == "-Padd"):
                 env['PATH'].insert(0, p)
             else:
                 env['PATH'].append(p)
-    print env.toShell(options.bourne)
+    print(env.toShell(options.bourne))
 else:
     (options, args) = attachParser.parse_args(argv)
     if options.debug:
         logging.basicConfig()
         logger.setLevel(logging.DEBUG)
     if len(args) < 1:
-        print locker.read_attachtab()._legacyFormat()
+        print(locker.read_attachtab()._legacyFormat())
     if not options.map:
         options.remap = False
     if options.explicit and not options.mountpoint:

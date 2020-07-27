@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import absolute_import, division, print_function, unicode_literals
 import sys, os
 import logging
 from optparse import OptionParser
@@ -13,28 +14,31 @@ def do_map(l, options):
     if not options.map:
         cmdline = l.getDeauthCommandline()
     if cmdline is None:
-        print >>sys.stderr, "%s: %s: %smapping not supported" % (sys.argv[0],
+        print("%s: %s: %smapping not supported" % (sys.argv[0],
                                                                  l.name,
-                                                                 '' if options.map else 'un')
+                                                                 '' if options.map else 'un'), file=sys.stderr)
     else:
         try:
             subprocess.check_call(cmdline)
             if options.verbose:
-                print >>sys.stderr, "%s: %s mapped" % (sys.argv[0],
-                                                       l.name)
+                print("%s: %s mapped" % (sys.argv[0],
+                                                       l.name), file=sys.stderr)
+
         except subprocess.CalledProcessError as e:
-            print >>sys.stderr, "%s: Unable to map %s" % (sys.argv[0],
-                                                          l.name)
+            print("%s: Unable to map %s" % (sys.argv[0],
+                                                          l.name), file=sys.stderr)
+
         except locker.LockerError as e:
-            print >>sys.stderr, "%s: %s: %s" % (sys.argv[0],
+            print("%s: %s: %s" % (sys.argv[0],
                                                 l.name,
-                                                e)
+                                                e), file=sys.stderr)
+
 
 def deprecated_callback(option, opt_str, value, parser):
     """
     An OptionParser callback for deprecated options
     """
-    print >>sys.stderr, "WARNING: '%s' is obsolete and will be removed in future versions." % (opt_str)
+    print("WARNING: '%s' is obsolete and will be removed in future versions." % (opt_str), file=sys.stderr)
 
 usage = """%prog [options] [-f] filesystem ...
        %prog [options] -c cell ...
@@ -111,6 +115,6 @@ for f in options.filesystems + args:
     if f in attachtab:
         do_map(attachtab[f], options)
     else:
-        print >>sys.stderr, "%s: %s not attached" % (sys.argv[0], f)
+        print("%s: %s not attached" % (sys.argv[0], f), file=sys.stderr)
 
 sys.exit(0)

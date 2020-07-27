@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import absolute_import, division, print_function, unicode_literals
 import sys, os
 import socket
 import logging
@@ -22,8 +23,7 @@ def deprecated_callback(option, opt_str, value, parser):
     """
     An OptionParser callback for deprecated options
     """
-    print >>sys.stderr, "WARNING: '%s' is obsolete and will be removed in future versions." % (opt_str)
-
+    print("WARNING: '%s' is obsolete and will be removed in future versions." % (opt_str), file=sys.stderr)
 parser = OptionParser(usage=usage, add_help_option=False)
 parser.set_defaults(zephyr=False, unmap=True, verbose=True,
                     all_filesys=False, explicit=False, fstype=[])
@@ -111,9 +111,9 @@ if options.all_filesys or options.host:
         try:
             attachtab[l].detach()
             if options.verbose:
-                print >>sys.stderr, "%s: %s detached" % (sys.argv[0], attachtab[l].name)
+                print("%s: %s detached" % (sys.argv[0], attachtab[l].name), file=sys.stderr)
         except locker.LockerError as e:
-            print >>sys.stderr, "%s: Unable to detach: %s" % (l, e)
+            print("%s: Unable to detach: %s" % (l, e), file=sys.stderr)
     sys.exit(0)
 
 for a in args:
@@ -121,9 +121,9 @@ for a in args:
         try:
             attachtab[a].detach()
             if options.verbose:
-                print >>sys.stderr, "%s: %s detached" % (sys.argv[0], attachtab[a].name)
+                print("%s: %s detached" % (sys.argv[0], attachtab[a].name), file=sys.stderr)
         except locker.LockerError as e:
-            print >>sys.stderr, "%s: Unable to detach: %s" % (l, e)
+            print("%s: Unable to detach: %s" % (l, e), file=sys.stderr)
     else:
-        print >>sys.stderr, "%s: Not attached." % (a,)
+        print("%s: Not attached." % (a,), file=sys.stderr)
 sys.exit(0)

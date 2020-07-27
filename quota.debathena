@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import absolute_import, division, print_function, unicode_literals
 import sys
 import locker
 import os
@@ -15,7 +16,7 @@ def deprecated_callback(option, opt_str, value, parser):
     """
     An OptionParser callback for deprecated options
     """
-    print >>sys.stderr, "WARNING: '%s' is obsolete and will be removed in future versions." % (opt_str)
+    print("WARNING: '%s' is obsolete and will be removed in future versions." % (opt_str), file=sys.stderr)
 
 parser = OptionParser(usage=usage)
 parser.set_defaults(verbose=False, all_filesys=False, parsable=False,
@@ -72,8 +73,8 @@ for x in set(options.filesys):
         continue
     if x not in at:
         # See NOTES[6]
-        print >>sys.stderr, "%s: Not attached." % (x,)
-        print >>sys.stderr, "%s: Unknown filesystem %s." % (sys.argv[0], x)
+        print("%s: Not attached." % (x,), file=sys.stderr)
+        print("%s: Unknown filesystem %s." % (sys.argv[0], x), file=sys.stderr)
         sys.exit(1)
     filesystems.append(at[x].mountpoint)
 
@@ -118,7 +119,7 @@ for l in at:
 
 if options.verbose:
     if options.parsable:
-        print "\n".join(output['parsable'])
+        print("\n".join(output['parsable']))
         sys.exit(0)
     uid = os.getuid()
     try:
@@ -126,15 +127,15 @@ if options.verbose:
     except Exception as e:
         logger.debug("Exception while getting username: %s", e)
         username = "unknown user"
-    print "Disk quotas for %s (uid %d)" % (username, uid)
-    print "%-16s %8s %8s %8s    %8s %8s %8s" % ("Filesystem",
+    print("Disk quotas for %s (uid %d)" % (username, uid))
+    print("%-16s %8s %8s %8s    %8s %8s %8s" % ("Filesystem",
                                                 "usage", "quota",
                                                 "limit", "files",
-                                                "quota", "limit")
-    print "\n".join(output['quotas'])
+                                                "quota", "limit"))
+    print("\n".join(output['quotas']))
 # We always print a blank line.
-print ''
+print('')
 if len(output['overage']) > 0:
-    print "\n".join(output['overage'])
+    print("\n".join(output['overage']))
 
 sys.exit(0)
